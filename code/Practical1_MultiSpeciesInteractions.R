@@ -141,3 +141,102 @@ ggplot(data = out.df)+
 #The prey population finally reaches an equilibrium at a lower carrying capacity (which makes sense considering that the predator population is negatively impacting it), and so does the predator as a consequence.
 #However, it almost seems as the predator reaches the equilibrium even before than the prey. Why?
 
+
+#Incorporating functional response
+
+#Prey consumption by predators is not always linear.
+#The rate at which predators can consume preys is called a functional response.
+#There are three types of functional response:
+##Type I: linear
+##Type II: logistic, where A controls the slope. When A is high, it A indicates poor hunting efficiency by the predator.
+#Let's see the effect of differen values of A:
+x <- seq(0,50,0.1)
+A <- 0.1
+y <- x/(1+A*x) 
+ggplot()+
+  geom_line(mapping=aes(x=x,y=x/(1+A*x)),color="blue") +
+  geom_hline(yintercept=0,color="darkgrey") +
+  geom_vline(xintercept=0,color="darkgrey") +
+  labs(x = "Prey population", y = "Prey consumed")
+
+
+A <- 1
+ggplot()+
+  geom_line(mapping=aes(x=x,y=x/(1+A*x)),color="blue") +
+  geom_hline(yintercept=0,color="darkgrey") +
+  geom_vline(xintercept=0,color="darkgrey") +
+  labs(x = "Prey population", y = "Prey consumed")
+
+#As we increase A, we can see that although the curves seems to reach its plateau faster, said plateau is smaller and smaller
+
+#Let's implement this to our model now.
+
+LV_FR <- function(t,state,parameters){ 
+  with(as.list(c(state, parameters)),{ 
+    dPx <- alfa*x - (beta*x*y)/(1+A*x) 
+    dPy <- (delta*x*y)/(1+A*x) - gamma*y 
+    return(list(c(dPx,dPy))) 
+  }
+  ) 
+}
+state <- c(x=10,y=10) ## the initial population values for both x (prey) and y (predator) populations
+parameters <- c(alfa=0.1, ## alfa is the growth rate of the x population,
+                beta=0.02, ## beta is the effect of y on the x growth rate,
+                delta=0.02, ## gamma is the effect of x on the y growth rate
+                gamma=0.4, ## and gamma is the predator death rate.
+                K=30,##carrying capacity
+                A=0.01) #predator efficiency at hunting 
+times <- seq(0,1000,by=0.01) ##a sequence of time steps – uses function seq()
+out <- ode(y = state, times = times, func = LV_FR, parms = parameters)
+out.df <- data.frame(out)
+ggplot(data = out.df)+
+  geom_line(mapping=aes(x=time,y=x),color="blue") +
+  geom_line(mapping=aes(x=time,y=y),color="red") +
+  geom_hline(yintercept=0,color="darkgrey") +
+  geom_vline(xintercept=0,color="darkgrey") +
+  labs(x = "Time", y = "P")
+ggplot(data = out.df)+
+  geom_path(mapping=aes(x=x,y=y),color="red") +
+  xlim(0,70) +
+  ylim(0,40) +
+  geom_hline(yintercept=0,color="darkgrey") +
+  geom_vline(xintercept=0,color="darkgrey") +
+  labs(x = "Prey", y = "Predator")
+#When we increase A (we lower the predator efficiency), the predator population goes to almost 0.
+
+#Now let's combine both the logistic growth and the functional response in our code
+
+LV_LG_FR <- function(t,state,parameters){ 
+  with(as.list(c(state, parameters)),{ 
+    dPx <- alfa*x*(1-x/K) - (beta*x*y)/(1+A*x) 
+    dPy <- (delta*x*y)/(1+A*x) - gamma*y 
+    return(list(c(dPx,dPy))) 
+  }
+  ) 
+}
+state <- c(x=10,y=10) ## the initial population values for both x (prey) and y (predator) populations
+parameters <- c(alfa=0.1, ## alfa is the growth rate of the x population,
+                beta=0.02, ## beta is the effect of y on the x growth rate,
+                delta=0.02, ## gamma is the effect of x on the y growth rate
+                gamma=0.4, ## and gamma is the predator death rate.
+                K=30,##carrying capacity
+                A=0.01) #predator efficiency at hunting 
+times <- seq(0,500,by=0.01) ##a sequence of time steps – uses function seq()
+out <- ode(y = state, times = times, func = LV_LG_FR, parms = parameters)
+out.df <- data.frame(out)
+ggplot(data = out.df)+
+  geom_line(mapping=aes(x=time,y=x),color="blue") +
+  geom_line(mapping=aes(x=time,y=y),color="red") +
+  geom_hline(yintercept=0,color="darkgrey") +
+  geom_vline(xintercept=0,color="darkgrey") +
+  labs(x = "Time", y = "P")
+ggplot(data = out.df)+
+  geom_path(mapping=aes(x=x,y=y),color="red") +
+  xlim(0,70) +
+  ylim(0,40) +
+  geom_hline(yintercept=0,color="darkgrey") +
+  geom_vline(xintercept=0,color="darkgrey") +
+  labs(x = "Prey", y = "Predator")
+#In this scenario, both populations reach an equilibrium at x=~25 and y=~2 (although, in reality, the predator population would have probably become extinct as it almost reaches 0 when t=~25)
+#This differs from the previous model, where we saw that both populations had very intense oscillations as t increased, never being close to reaching and equilibrium.
+#In fact, if we increase A, in the previous model we can see how the prey population grows exponentially, while in this model it reaches an equilibrium at its carrying capacity (K=30)
