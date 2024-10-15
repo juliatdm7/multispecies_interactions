@@ -101,3 +101,43 @@ ggplot(data = out.df)+
   labs(x = "Prey", y = "Predator", title="Predator vs. Prey population (increasing alfa)")
 
 
+#Prey Growth Rate: exponential vs. logistic
+
+LV_LG <- function(t,state,parameters){ ##logistic grown function, that takes a set of parameter values, initial conditions and atime sequence
+  with(as.list(c(state, parameters)),{ ##"with" is a function that allows us to use the variable names directly - it looks for r, K and P in state and parameters
+    dPx <- alfa*x*(1-x/K) - beta*x*y ##this is the equation governing the rate of change of our prey population (x)...
+    dPy <- delta*x*y - gamma*y ##...and this is the equation governing the rate of change of our predator population (y)
+    return(list(c(dPx,dPy))) ## return the rate of change - it needs to be a list
+  }
+  ) # end with(as.list ...
+}
+
+state <- c(x=10,y=10) ## the initial population values for both x (prey) and y (predator) populations
+parameters <- c(alfa=0.1, ## alfa is the growth rate of the x population,
+                beta=0.02, ## beta is the effect of y on the x growth rate,
+                delta=0.02, ## gamma is the effect of x on the y growth rate
+                gamma=0.4,
+                K=30)  ## and gamma is the predator death rate.
+times <- seq(0,500,by=0.01) ##a sequence of time steps – uses function seq()
+out <- ode(y = state, times = times, func = LV_LG, parms = parameters)
+out.df <- data.frame(out)
+ggplot(data = out.df)+
+  geom_line(mapping=aes(x=time,y=x),color="blue") +
+  geom_line(mapping=aes(x=time,y=y),color="red") +
+  geom_hline(yintercept=0,color="darkgrey") +
+  geom_vline(xintercept=0,color="darkgrey") +
+  labs(x = "Time", y = "P")
+ggplot(data = out.df)+
+  geom_path(mapping=aes(x=x,y=y),color="red") +
+  xlim(0,70) +
+  ylim(0,40) +
+  geom_hline(yintercept=0,color="darkgrey") +
+  geom_vline(xintercept=0,color="darkgrey") +
+  labs(x = "Prey", y = "Predator")
+#What we see now it's that both prey and predator populations reach an equilibrium: prey population reaches it at size 20 (which is 2/3 of its carrying capacity K) while the predator population reaches it much lower (at around 2)
+#Starting at the same population size, the predator preys heavily on the prey population, which makes it heavily decrease and, as a consequence, the predator population also decreases fast. 
+#This allows the prey population to rebounce even overshooting its carrying capacity. 
+#The predator peaks as well, as a consequence, but at a lower peak, which has an impact on the prey population, but not as heavy as before.
+#The prey population finally reaches an equilibrium at a lower carrying capacity (which makes sense considering that the predator population is negatively impacting it), and so does the predator as a consequence.
+#However, it almost seems as the predator reaches the equilibrium even before than the prey. Why?
+
