@@ -43,12 +43,12 @@ nsteps <- 200
 pop.df.0 <- data.frame(time=1:nsteps,P=numeric(nsteps),L=numeric(nsteps),H=numeric(nsteps),C=numeric(nsteps),M=numeric(nsteps),W=numeric(nsteps))
 
 pop.df.0 <- within(pop.df.0,{
-  P[1] <- 0
-  L[1] <- 0
-  H[1] <- 0
-  C[1] <- 0
-  M[1] <- 0
-  W[1] <- 0
+  P[1] <- 240
+  L[1] <- 870
+  H[1] <- 970
+  C[1] <- 7
+  M[1] <- 25
+  W[1] <- 8
 })
 
 #Writing down and storaging birth and death equations for all elements:
@@ -56,39 +56,39 @@ pop.df.0 <- within(pop.df.0,{
 
 for(t in 1:(nsteps-1)){
   pop.df.0 <- within(pop.df.0,{
-    plant_birth <- sP * pop.df.0$P[t] * (1-pop.df.0$P[t]/Kp) - ((C[t] * lP * pop.df.0$P[t])/(hp + pop.df.0$P[t]))
-    lichen_birth <- sL * pop.df.0$L[t] * (1-pop.df.0$L[t]/Kl) - ((C[t] * lL * pop.df.0$L[t])/(hl + pop.df.0$L[t]))
-    forage_birth <- sH * pop.df.0$H[t] * (1-pop.df.0$H[t]/Kh) - ((C[t] * lH * pop.df.0$H[t])/(hh + pop.df.0$H[t]))
+    plant_birth <- sP * P[t] * (1 - P[t]/Kp) 
+    lichen_birth <- sL * L[t] * (1 - L[t]/Kl) 
+    forage_birth <- sH * H[t] * (1 - H[t]/Kh)
     caribou_growth <- C[t] * fC * (L[t]/(L[t]+hl)) * (P[t]/(P[t]+hp))
     moose_growth <- M[t] * fM * (H[t]/(H[t]+hh))
     wolf_growth <- W[t] * b * ((C[t]/(C[t]+dC)) + (M[t]/(M[t]+dM)))
     
     plant_death <- (C[t]*lP*P[t])/(hp+P[t])
-    lichen_death <- (L[t]*lL*L[t])/(hl+L[t])
-    forage_death <- (H[t]*lH*H[t])/(hh+H[t])
+    lichen_death <- (C[t]*lL*L[t])/(hl+L[t])
+    forage_death <- (M[t]*lH*H[t])/(hh+H[t])
     caribou_death <- C[t] * (1 - P[t]/(P[t]+hp)) * (1 - L[t]/(L[t]+hl))
-    caribou_pred <- C[t] * ((W[t]*eC*C[t])/(C[t]+dC))
+    caribou_pred <- ((W[t]*eC*C[t])/(C[t]+dC))
     moose_death <- M[t] * (1 - H[t]/(H[t]+hh))
-    moose_pred <- M[t] * ((W[t]*eM*M[t])/(M[t]+dM))
+    moose_pred <- ((W[t]*eM*M[t])/(M[t]+dM))
     wolf_death <- W[t] * g
     
     
     
-    P[t+1] <- max(0, (P[t] + plant_birth + plant_death)) ##plants consumed by Caribou
-    L[t+1] <- max(0, (L[t] + lichen_birth + lichen_death)) ##lichen consumed by Caribou
-    H[t+1] <- max(0, (H[t] + forage_birth + forage_death)) ##plants consumed by Moose
+    P[t+1] <- max(0, (P[t] + plant_birth - plant_death)) ##plants consumed by Caribou
+    L[t+1] <- max(0, (L[t] + lichen_birth - lichen_death)) ##lichen consumed by Caribou
+    H[t+1] <- max(0, (H[t] + forage_birth - forage_death)) ##plants consumed by Moose
     
     C[t+1] <- max(0, (C[t] + caribou_growth - caribou_death - caribou_pred))
     
     M[t+1] <- max(0, (M[t] + moose_growth - moose_death - moose_pred))
     
-    W[t] <- max(0, (W[t] + wolf_growth - wolf_death))
+    W[t+1] <- max(0, (W[t] + wolf_growth - wolf_death))
   })
 }
 
 #When initial population size for all of them is 0, it stays in 0.
 
-
+library(ggplot2)
 colors <- c("Plants"="brown","Lichen"="orange","Shrubs"="green","Caribou"="purple","Moose"="blue","Wolf"="red")
 ggplot(data = pop.df.0)+
   geom_line(mapping=aes(x=time,y=P,color="Plants")) +
