@@ -89,15 +89,15 @@ for(t in 1:(nsteps-1)){
 
 colors <- c("Plants"="brown","Lichen"="orange","Shrubs"="green","Caribou"="purple","Moose"="blue","Wolf"="red")
 ggplot(data = pop.df.0)+
-  geom_line(mapping=aes(x=time,y=P,color="Plants")) +
-  geom_line(mapping=aes(x=time,y=L,color="Lichen")) +
-  geom_line(mapping=aes(x=time,y=H,color="Shrubs")) +
-  geom_line(mapping=aes(x=time,y=C,color="Caribou")) +
-  geom_line(mapping=aes(x=time,y=M,color="Moose")) +
-  geom_line(mapping=aes(x=time,y=W,color="Wolf")) +
+  geom_line(mapping=aes(x=time,y=P,color="Plants"), linewidth = 0.75) +
+  geom_line(mapping=aes(x=time,y=L,color="Lichen"), linewidth = 0.75) +
+  geom_line(mapping=aes(x=time,y=H,color="Shrubs"), linewidth = 0.75) +
+  geom_line(mapping=aes(x=time,y=C,color="Caribou"), linewidth = 0.75) +
+  geom_line(mapping=aes(x=time,y=M,color="Moose"), linewidth = 0.75) +
+  geom_line(mapping=aes(x=time,y=W,color="Wolf"), linewidth = 0.75) +
   geom_hline(yintercept=0,color="darkgrey") +
   geom_vline(xintercept=0,color="darkgrey") +
-  labs(x = "Time", y = "Densities", color="Legend")+
+  labs(x = "Time", y = "Densities", color="Legend", title = "Original model")+
   scale_color_manual(values = colors)
 
 
@@ -267,6 +267,7 @@ for(t in 1:(nsteps-1)){
     #Wolf populations
     wolf_growth <- W[t] * b * ((C[t]/(C[t]+dC)) + (M[t]/(M[t]+dM)))
     wolf_death <- W[t] * g
+    wolf_hunt <- W[t] * mW
     
     
     P[t+1] <- max(0, (P[t] + plant_birth - plant_death)) ##plants consumed by Caribou
@@ -275,9 +276,9 @@ for(t in 1:(nsteps-1)){
     
     C[t+1] <- max(0, (C[t] + caribou_growth - caribou_death - caribou_pred))
     
-    M[t+1] <- max(0, min(30, (M[t] + moose_growth - moose_death - moose_pred)))
+    M[t+1] <- max(0, (M[t] + moose_growth - moose_death - moose_pred))
     
-    W[t+1] <- max(0, (W[t] + wolf_growth - wolf_death))
+    W[t+1] <- max(0, (W[t] + wolf_growth - wolf_death - wolf_hunt))
   })
 }
 
@@ -292,15 +293,142 @@ ggplot(data = pop.df.0)+
   geom_line(mapping=aes(x=time,y=W,color="Wolf")) +
   geom_hline(yintercept=0,color="darkgrey") +
   geom_vline(xintercept=0,color="darkgrey") +
-  labs(x = "Time", y = "Densities", color="Legend", title = "Limiting moose max. size at 30")+
+  labs(x = "Time", y = "Densities", color="Legend", title = "Promoting wolf hunting at a constant rate")+
+  scale_color_manual(values = colors)
+
+#If we apply a constant hunting rate, wolf population ends up stabilising at around 11 individuals.
+#Moose experiment a rapid growth in the first 25-20 timesteps, but then decrease and stabilise at around 65 individuals, more or less.
+#Caribous, although they also experiment some growth at teh beginning (reaching, maybe, between 12-14 individuals), they go back down and stay between 5-7 individuals.
+
+
+##Now, instead of hunting wolves, we can try to hunt moose, which take longer to recover than wolves:
+
+mM <- 0.1
+
+for(t in 1:(nsteps-1)){
+  pop.df.0 <- within(pop.df.0,{
+    #Plant populations
+    plant_birth <- sP * P[t] * (1 - P[t]/Kp)
+    plant_death <- (C[t]*lP*P[t])/(hp+P[t]) 
+    
+    #Lichen populations
+    lichen_birth <- sL * L[t] * (1 - L[t]/Kl)
+    lichen_death <- (C[t]*lL*L[t])/(hl+L[t])
+    
+    #Forage populations
+    forage_birth <- sH * H[t] * (1 - H[t]/Kh)
+    forage_death <- (M[t]*lH*H[t])/(hh+H[t])
+    
+    #Caribou populations
+    caribou_growth <- C[t] * fC * (L[t]/(L[t]+hl)) * (P[t]/(P[t]+hp))
+    caribou_death <- C[t] * (1 - P[t]/(P[t]+hp)) * (1 - L[t]/(L[t]+hl))
+    caribou_pred <- ((W[t]*eC*C[t])/(C[t]+dC))
+    
+    #Moose populations
+    moose_growth <- M[t] * fM * (H[t]/(H[t]+hh))
+    moose_death <- M[t] * (1 - H[t]/(H[t]+hh))
+    moose_pred <- ((W[t]*eM*M[t])/(M[t]+dM))
+    moose_hunt <- M[t] * mM
+    
+    #Wolf populations
+    wolf_growth <- W[t] * b * ((C[t]/(C[t]+dC)) + (M[t]/(M[t]+dM)))
+    wolf_death <- W[t] * g
+    wolf_hunt <- W[t] * mW
+    
+    
+    P[t+1] <- max(0, (P[t] + plant_birth - plant_death)) ##plants consumed by Caribou
+    L[t+1] <- max(0, (L[t] + lichen_birth - lichen_death)) ##lichen consumed by Caribou
+    H[t+1] <- max(0, (H[t] + forage_birth - forage_death)) ##plants consumed by Moose
+    
+    C[t+1] <- max(0, (C[t] + caribou_growth - caribou_death - caribou_pred))
+    
+    M[t+1] <- max(0, (M[t] + moose_growth - moose_death - moose_pred - moose_hunt))
+    
+    W[t+1] <- max(0, (W[t] + wolf_growth - wolf_death))
+  })
+}
+
+ggplot(data = pop.df.0)+
+  geom_line(mapping=aes(x=time,y=P,color="Plants")) +
+  geom_line(mapping=aes(x=time,y=L,color="Lichen")) +
+  geom_line(mapping=aes(x=time,y=H,color="Shrubs")) +
+  geom_line(mapping=aes(x=time,y=C,color="Caribou")) +
+  geom_line(mapping=aes(x=time,y=M,color="Moose")) +
+  geom_line(mapping=aes(x=time,y=W,color="Wolf")) +
+  geom_hline(yintercept=0,color="darkgrey") +
+  geom_vline(xintercept=0,color="darkgrey") +
+  labs(x = "Time", y = "Densities", color="Legend", title = "Promoting moose hunting at a constant rate")+
   scale_color_manual(values = colors)
 
 
+#In this case, moose populations experiment oscillations between 22 and 73 individuals, and as a consequence wolves oscillate between 12 and 27 individuals.
+#Caribous oscillate between 3 and 5 individuals.
 
 
+###Some other measurements###
 
 
+#Implement hunting one every 10 years
 
+for(t in 1:(nsteps-1)){
+  pop.df.0 <- within(pop.df.0,{
+    #Plant populations
+    plant_birth <- sP * P[t] * (1 - P[t]/Kp)
+    plant_death <- (C[t]*lP*P[t])/(hp+P[t]) 
+    
+    #Lichen populations
+    lichen_birth <- sL * L[t] * (1 - L[t]/Kl)
+    lichen_death <- (C[t]*lL*L[t])/(hl+L[t])
+    
+    #Forage populations
+    forage_birth <- sH * H[t] * (1 - H[t]/Kh)
+    forage_death <- (M[t]*lH*H[t])/(hh+H[t])
+    
+    #Caribou populations
+    caribou_growth <- C[t] * fC * (L[t]/(L[t]+hl)) * (P[t]/(P[t]+hp))
+    caribou_death <- C[t] * (1 - P[t]/(P[t]+hp)) * (1 - L[t]/(L[t]+hl))
+    caribou_pred <- ((W[t]*eC*C[t])/(C[t]+dC))
+    
+    #Moose populations
+    moose_growth <- M[t] * fM * (H[t]/(H[t]+hh))
+    moose_death <- M[t] * (1 - H[t]/(H[t]+hh))
+    moose_pred <- ((W[t]*eM*M[t])/(M[t]+dM))
+    moose_hunt <- M[t] * mM
+    
+    #Wolf populations
+    wolf_growth <- W[t] * b * ((C[t]/(C[t]+dC)) + (M[t]/(M[t]+dM)))
+    wolf_death <- W[t] * g
+    wolf_hunt <- W[t] * mW
+    
+    
+    P[t+1] <- max(0, (P[t] + plant_birth - plant_death)) ##plants consumed by Caribou
+    L[t+1] <- max(0, (L[t] + lichen_birth - lichen_death)) ##lichen consumed by Caribou
+    H[t+1] <- max(0, (H[t] + forage_birth - forage_death)) ##plants consumed by Moose
+    
+    C[t+1] <- max(0, (C[t] + caribou_growth - caribou_death - caribou_pred))
+    
+    M[t+1] <- max(0, (M[t] + moose_growth - moose_death - moose_pred - moose_hunt))
+    
+    if (nsteps %% 10) {
+      W[t+1] <- max(0, (W[t] + wolf_growth - wolf_death - wolf_hunt ))
+    } else {
+      W[t+1] <- max(0, (W[t] + wolf_growth - wolf_death))
+    }
+    
+  })
+}
+
+ggplot(data = pop.df.0)+
+  geom_line(mapping=aes(x=time,y=P,color="Plants")) +
+  geom_line(mapping=aes(x=time,y=L,color="Lichen")) +
+  geom_line(mapping=aes(x=time,y=H,color="Shrubs")) +
+  geom_line(mapping=aes(x=time,y=C,color="Caribou")) +
+  geom_line(mapping=aes(x=time,y=M,color="Moose")) +
+  geom_line(mapping=aes(x=time,y=W,color="Wolf")) +
+  geom_hline(yintercept=0,color="darkgrey") +
+  geom_vline(xintercept=0,color="darkgrey") +
+  labs(x = "Time", y = "Densities", color="Legend", title = "Promoting moose hunting at a constant rate")+
+  scale_color_manual(values = colors)
 
 
 
